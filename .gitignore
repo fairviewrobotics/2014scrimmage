@@ -1,11 +1,11 @@
- #Ignore object files
- *.[oa]
+# Ignore object files
+*.[oa]
  
- #Ignore any project files
- .cproject
- .project
- .wrmakefile
- .wrproject
+# Ignore any project files
+.cproject
+.project
+.wrmakefile
+.wrproject
  
- #Ignore any output files
- PPC603gnu/
+# Ignore any output files
+PPC603gnu/
