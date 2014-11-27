@@ -6,19 +6,22 @@ float shooterSpeed = 0.0;
 float loaderSpeed = 0.0;
 
 class RobotDemo : public IterativeRobot {
-
-    // RobotDrive myRobot; // robot drive system
-    Joystick *controllerOne;
-    Joystick *controllerTwo;
-    
+	// Drive system motor controllers
     Talon *rightFront;
     Talon *leftFront;
     Talon *rightBack;
     Talon *leftBack;
-    Victor *shooter;
-    Talon *loader;
 
-    //Relay *shooterLights; not needed
+    // Loader and shooter motor controllers
+    Talon *loader;
+    Victor *shooter;
+
+    // Shooter timer
+    Timer *shooterTimer;
+
+    // Joysticks
+    Joystick *controllerLeft;
+    Joystick *controllerRight;
 
 public:
     RobotDemo(void) {
@@ -26,15 +29,16 @@ public:
 
   		rightFront = new Talon(1);
   		leftFront  = new Talon(2);
-  		rightBack = new Talon(3);
-  		leftBack = new Talon(4);
-  		loader = new Talon(5);
-  		shooter = new Victor(6);
+  		rightBack  = new Talon(3);
+  		leftBack   = new Talon(4);
+
+  		loader     = new Talon(5);
+  		shooter    = new Victor(6);
   		
-  		controllerOne = new Joystick(1);
-  		controllerTwo = new Joystick(2);
-  	//	shooterLights = new Relay(1, Relay::kForwardOnly);
-  		
+  		shooterTimer = new Timer();
+
+  		controllerLeft  = new Joystick(1);
+  		controllerRight = new Joystick(2);  		
  
   		// Acquire the Driver Station object
   		m_ds = DriverStation::GetInstance();
@@ -44,74 +48,70 @@ public:
 
   	/********************************** Init Routines *************************************/
 
-  	void RobotInit(void) {
-  	}
-
-  	void DisabledInit(void) {
-  	}
-
-  	void AutonomousInit(void) {
-  	}
+  	void RobotInit(void) {}
+  	void DisabledInit(void) {}
+  	void AutonomousInit(void) {}
 
   	void TeleopInit(void) {
-  		// Set all motor controllers to not moving.
-  		// shooter->SetSpeed(0.0);
+  		// Set all motor controllers to be not moving.
   		leftFront->SetSpeed(0.0);
   		rightFront->SetSpeed(0.0);
   		leftBack->SetSpeed(0.0);
   		rightBack->SetSpeed(0.0);
+
   		shooter->SetSpeed(0.0);
   		loader->SetSpeed(0.0);
-  		//shooterLights->Set(Relay::kOn);
   	}
+  	
+  	void motorControlLeft(float speed) {
+		leftFront->SetSpeed(speed);
+		leftBack->SetSpeed(speed);
+	}
+
+	void motorControlRight(float speed) {
+		rightFront->SetSpeed(speed);
+		rightBack->SetSpeed(speed);
+	}
 
   	/********************************** Periodic Routines *************************************/
 
-  	void DisabledPeriodic(void) {
-  	}
-
-
-
-  	void AutonomousPeriodic(void) {
-  		
-  		
-  	}
+  	void DisabledPeriodic(void) {}
+  	void AutonomousPeriodic(void) {}
 
   	void TeleopPeriodic(void) {
-  		// http://www.chiefdelphi.com/forums/showthread.php?t=82825
-  		// 1 - LeftX
-  	    // 2 - LeftY
-        // 3 - Triggers (Each trigger = 0 to 1, axis value = right - left)
-        // 4 - RightX
-        // 5 - RightY
-        // 6 - DPad Left/Right
+  		float leftStick  = controllerLeft->GetRawAxis(2);  // Drive system
+  		float rightStick = controllerRight->GetRawAxis(2); // Drive system
+  		bool moveLeft  = controllerLeft->GetRawButton(1);  // Trigger to slide left
+  		bool moveRight = controllerRight->GetRawButton(1); // Trigger to slide right
+  		bool moveHalfLeft  = controllerLeft->GetRawButton(2);  // Half speed slide left
+  		bool moveHalfRight = controllerRight->GetRawButton(2); // Half speed slide right
+  		bool loadButton = controllerLeft->GetRawButton(3);   // Loader
+  		bool shootButton = controllerRight->GetRawButton(3); // Shooter
 
-  		float leftStick  = -1 * controller->GetRawAxis(2); // Drive system
-  		float rightStick = controller->GetRawAxis(5); // Drive system
-  		// bool buttonA  = controller->GetRawButton(1);
-  		// bool buttonB  = controller->GetRawButton(2);
-  		// bool buttonX  = controller->GetRawButton(3);
-  		// bool buttonY  = controller->GetRawButton(4);
-  		bool leftBumper = controller->GetRawButton(5); // Fire shooter
-  		bool rightBumper = controller->GetRawButton(6); // Move loader
-  		// bool buttonBack  = controller->GetRawButton(7);
-  		// bool buttonStart = controller->GetRawButton(8);
-  		// bool leftStickPress = controller->GetRawButton(9);
-  		// bool rightStickPress = controller->GetRawButton(10);
-
-  		// Shooter control
-  		if(leftBumper) {
-  			shooterSpeed = -1.0; // Forward (-)
-  		} else {
-  			shooterSpeed = 0.0;
-  		}
-  		
-  		// Loader control
-  		if(rightBumper) {
-			loaderSpeed = 1.0; // Forward (+)
+  		// Loader control (hold down button)
+  		if(loadButton) {
+			loaderSpeed = -1.0;
 		} else {
 			loaderSpeed = 0.0;
-		} 
+		}
+
+  		// Shooter control (toggle button with timer)
+		if(shootButton) {
+			shooterTimer->Reset(); // Set timer back to 0
+			shooterTimer->Start();
+		} else if(shooterTimer->Get() > 0) {
+			shooterSpeed = 1.0;
+
+			if(shooterTimer->Get() > 1.5) { // Threshold when shooter will be going near max speed
+				loaderSpeed = 0.2;
+			} else if(shooterTimer->Get() > 2.0) { // Threshold when disk will have been launched
+				shooterSpeed = 0.0;
+				shooterTimer->Stop();
+				shooterTimer->Reset(); // Set timer back to 0
+			}
+		} else {
+			shooterSpeed = 0.0;
+		}
 
   		// Print values (rate limited to 1/20)
   		// if(printCounter % 20 == 0) {
@@ -120,40 +120,47 @@ public:
   		// }
   		// printCounter++;
 
+
   		// Drive system deadzone
-  		if(leftStick < 0.3 && leftStick > -0.3) {
+  		if(leftStick < 0.1 && leftStick > -0.1) {
   			leftStick = 0.0;
   		}
-  		if(rightStick < 0.3 && rightStick > -0.3) {
+  		if(rightStick < 0.1 && rightStick > -0.1) {
   			rightStick = 0.0;
   		}
 
   		// Motor speed declarations done at the end to ensure watchdog is continually updated.
-  		motorControlLeft(leftStick);
-  		motorControlRight(rightStick);
+  		if (moveLeft) {
+  			leftFront->SetSpeed(-1.0); // backwards
+  			leftBack->SetSpeed(1.0);
+  			rightFront->SetSpeed(1.0);
+  			rightBack->SetSpeed(-1.0);
+  		} else if (moveRight) {
+  			leftFront->SetSpeed(1.0);
+  			leftBack->SetSpeed(-1.0);
+  			rightFront->SetSpeed(-1.0);
+  			rightBack->SetSpeed(1.0);
+  		} else if (moveHalfLeft) {
+			leftFront->SetSpeed(-0.5); // backwards
+			leftBack->SetSpeed(0.5);
+			rightFront->SetSpeed(0.5);
+			rightBack->SetSpeed(-0.5);
+		} else if (moveHalfRight) {
+			leftFront->SetSpeed(0.5);
+			leftBack->SetSpeed(-0.5);
+			rightFront->SetSpeed(-0.5);
+			rightBack->SetSpeed(0.5);
+  		} else {
+  			motorControlLeft(leftStick);
+  			motorControlRight(rightStick);
+  		}
   		shooter->SetSpeed(shooterSpeed);
   		loader->SetSpeed(loaderSpeed);
   	}
 
-
-  	void DisabledContinuous(void) {
-  	}
-          
-  	void AutonomousContinuous(void) {
-  	}
-
-  	void TeleopContinuous(void) {
-  	}
-  	
-  	void motorControlLeft(float speed) {
-  		left->SetSpeed(speed);
-  	}
-
-  	void motorControlRight(float speed) {
-  		right->SetSpeed(speed);
-  	}
-  	
-  	
+  	void DisabledContinuous(void) {}
+  	void AutonomousContinuous(void) {}
+  	void TeleopContinuous(void) {}
   };
 
   START_ROBOT_CLASS(RobotDemo)
