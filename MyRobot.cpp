@@ -90,9 +90,9 @@ public:
 
   		// Loader control (hold down button)
   		if(loadButton) {
-			loaderSpeed = -1.0;
+			shooterSpeed = 0.25; // Load disks into under the loader wheel using the shooter
 		} else {
-			loaderSpeed = 0.0;
+			shooterSpeed = 0.0;
 		}
 
   		// Shooter control (toggle button with timer)
@@ -100,10 +100,10 @@ public:
 			shooterTimer->Reset(); // Set timer back to 0
 			shooterTimer->Start();
 		} else if(shooterTimer->Get() > 0) {
-			shooterSpeed = 1.0;
+			shooterSpeed = -1.0; // (-) means shooting
 
 			if(shooterTimer->Get() > 1.5) { // Threshold when shooter will be going near max speed
-				loaderSpeed = 0.2;
+				loaderSpeed = -0.2; // (-) means loading to the shooter
 			} else if(shooterTimer->Get() > 2.0) { // Threshold when disk will have been launched
 				shooterSpeed = 0.0;
 				shooterTimer->Stop();
